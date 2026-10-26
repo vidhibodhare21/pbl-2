@@ -451,6 +451,8 @@
     }
 
     .recommendation strong { color: #354d38; }
+    .report-photo { display: none; }
+    .report-print-title { display: none; }
     .detail-section {
       margin-top: 17px;
       padding-top: 15px;
@@ -492,6 +494,21 @@
       .explanation { grid-template-columns: 76px 1fr; }
       .heatmap { height: 72px; }
       .heat-spot { left: 39px; }
+    }
+
+    @media print {
+      body { background: white; }
+      .topbar, .intro, .workspace > .card:first-child, .footer-note { display: none !important; }
+      main { width: 100%; margin: 0; }
+      .workspace { display: block; }
+      .report-card { min-height: 0; border: 0; box-shadow: none; }
+      .report-head { padding: 0 0 12px; }
+      .report-content { display: block !important; padding: 16px 0; }
+      .report-photo { display: flex; align-items: center; gap: 12px; margin: 0 0 16px; }
+      .report-photo img { width: 120px; height: 90px; border-radius: 8px; object-fit: contain; background: #f4f5f0; }
+      .report-photo figcaption { color: #58655b; font-size: 10px; line-height: 1.5; }
+      .report-print-title { display: block; margin: 0 0 3px; color: var(--ink); font-size: 12px; font-weight: 700; }
+      .detail-section, .recommendation, .explanation { break-inside: avoid; }
     }
   </style>
 </head>
@@ -542,9 +559,9 @@
           </div>
         </div>
         <div class="upload-actions">
-          <button class="primary-button" id="analyze-button" type="button" disabled data-en="Analyze leaf" data-hi="पत्ती का विश्लेषण करें">Analyze leaf</button>
+          <button class="primary-button" id="analyze-button" type="button" data-en="Generate report" data-hi="रिपोर्ट तैयार करें">Generate report</button>
         </div>
-        <div class="privacy-note" data-en="Images stay in your browser in this preview. Diagnosis requires a connected model service." data-hi="इस पूर्वावलोकन में तस्वीर आपके ब्राउज़र में ही रहती है। वास्तविक निदान के लिए मॉडल सेवा जोड़ना आवश्यक है।">Images stay in your browser in this preview. Diagnosis requires a connected model service.</div>
+        <div class="privacy-note" data-en="Select a leaf photo, then generate a print-ready report. This demo has no connected diagnosis model, so its disease information is illustrative." data-hi="पत्ती की तस्वीर चुनें, फिर प्रिंट करने योग्य रिपोर्ट तैयार करें। इस डेमो में निदान मॉडल जुड़ा नहीं है, इसलिए रोग की जानकारी केवल उदाहरण है।">Select a leaf photo, then generate a print-ready report. This demo has no connected diagnosis model, so its disease information is illustrative.</div>
       </article>
 
       <article class="card report-card">
@@ -554,6 +571,13 @@
         </div>
         <div class="report-content visible" id="report-content" aria-live="polite">
           <div class="sample-notice" data-en="Illustrative sample only — this report is not generated from your uploaded image." data-hi="केवल उदाहरण: यह रिपोर्ट आपकी अपलोड की गई तस्वीर से तैयार नहीं हुई है।">Illustrative sample only — this report is not generated from your uploaded image.</div>
+          <figure class="report-photo" id="report-photo">
+            <img id="report-preview" alt="">
+            <figcaption>
+              <span class="report-print-title" data-en="Uploaded leaf photo" data-hi="अपलोड की गई पत्ती की तस्वीर">Uploaded leaf photo</span>
+              <span id="report-photo-caption" data-en="No image selected. The sample information below is not an image-based diagnosis." data-hi="कोई तस्वीर नहीं चुनी गई। नीचे दी गई नमूना जानकारी तस्वीर पर आधारित निदान नहीं है।">No image selected. The sample information below is not an image-based diagnosis.</span>
+            </figcaption>
+          </figure>
           <div class="result-top">
             <div>
               <p class="result-kicker" data-en="Example condition" data-hi="उदाहरण के लिए संभावित रोग">Example condition</p>
@@ -613,6 +637,7 @@
     const reportContent = document.getElementById("report-content");
     let currentLanguage = "en";
     let currentStatus = "sample";
+    let selectedFileName = "";
     let previewUrl;
 
     const translations = {
@@ -621,8 +646,7 @@
         sample: "SAMPLE REPORT",
         title: "Citrus Lens — Explainable leaf diagnosis",
         chooseImage: "Choose a JPG, PNG or WEBP image.",
-        imageTooLarge: "Choose an image smaller than 10 MB.",
-        modelUnavailable: "The image preview works, but a diagnosis model is not connected yet. Use “View sample report” to explore the explainability layout."
+        imageTooLarge: "Choose an image smaller than 10 MB."
       },
       hi: {
         awaiting: "तस्वीर की प्रतीक्षा",
@@ -630,8 +654,7 @@
         sample: "नमूना रिपोर्ट",
         title: "Citrus Lens — सिट्रस पत्ती का समझने योग्य निदान",
         chooseImage: "JPG, PNG या WEBP तस्वीर चुनें।",
-        imageTooLarge: "10 MB से छोटी तस्वीर चुनें।",
-        modelUnavailable: "तस्वीर का पूर्वावलोकन उपलब्ध है, लेकिन निदान मॉडल अभी जुड़ा नहीं है। व्याख्या का प्रारूप देखने के लिए “नमूना रिपोर्ट देखें” चुनें।"
+        imageTooLarge: "10 MB से छोटी तस्वीर चुनें।"
       }
     };
 
@@ -653,6 +676,9 @@
       document.querySelectorAll("[data-aria-en][data-aria-hi]").forEach((element) => {
         element.setAttribute("aria-label", language === "en" ? element.dataset.ariaEn : element.dataset.ariaHi);
       });
+      if (selectedFileName) {
+        document.getElementById("report-photo-caption").textContent = selectedFileName;
+      }
       document.querySelectorAll("[data-language]").forEach((button) => {
         button.setAttribute("aria-pressed", String(button.dataset.language === language));
       });
@@ -663,10 +689,11 @@
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       previewUrl = undefined;
       preview.removeAttribute("src");
+      document.getElementById("report-preview").removeAttribute("src");
       imageName.textContent = "";
+      selectedFileName = "";
       dropZone.classList.remove("has-image");
       fileInput.value = "";
-      analyzeButton.disabled = true;
       updateStatus("sample");
       reportContent.classList.add("visible");
     }
@@ -684,9 +711,11 @@
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       previewUrl = URL.createObjectURL(file);
       preview.src = previewUrl;
+      document.getElementById("report-preview").src = previewUrl;
       imageName.textContent = file.name;
+      selectedFileName = file.name;
+      document.getElementById("report-photo-caption").textContent = file.name;
       dropZone.classList.add("has-image");
-      analyzeButton.disabled = false;
       updateStatus("ready");
       reportContent.classList.add("visible");
     }
@@ -698,7 +727,12 @@
     fileInput.addEventListener("change", (event) => selectImage(event.target.files[0]));
     document.getElementById("remove-button").addEventListener("click", clearPreview);
     analyzeButton.addEventListener("click", () => {
-      window.alert(translations[currentLanguage].modelUnavailable);
+      if (!previewUrl) {
+        fileInput.click();
+        return;
+      }
+      updateStatus("sample");
+      window.print();
     });
     requestAnimationFrame(() => {
       document.getElementById("confidence-bar").style.width = "87%";
