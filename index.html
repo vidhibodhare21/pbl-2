@@ -1,0 +1,725 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f7f8f2">
+  <title>Citrus Lens — Explainable leaf diagnosis</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #23352a;
+      --muted: #738077;
+      --green: #34784c;
+      --green-dark: #255d39;
+      --green-soft: #eaf2e8;
+      --lime: #d8e8ae;
+      --canvas: #f7f8f2;
+      --surface: #fff;
+      --line: #e7ebe3;
+      --amber: #a66a20;
+      --amber-soft: #fbf2df;
+      --shadow: 0 12px 32px rgb(35 53 42 / 5%);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      background: var(--canvas);
+      color: var(--ink);
+    }
+
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+
+    .topbar {
+      height: 76px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 max(5vw, 24px);
+      background: rgb(255 255 255 / 82%);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      font-size: 17px;
+      font-weight: 750;
+      letter-spacing: -.4px;
+    }
+
+    .brand-mark {
+      width: 36px;
+      height: 36px;
+      display: grid;
+      place-items: center;
+      border-radius: 12px;
+      background: var(--green-soft);
+      color: var(--green);
+    }
+
+    .brand-mark svg { width: 22px; height: 22px; }
+    .top-actions { display: flex; align-items: center; gap: 18px; }
+    .top-note { color: var(--muted); font-size: 13px; }
+    .language-switch {
+      display: inline-flex;
+      gap: 3px;
+      padding: 3px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: #f8f9f6;
+    }
+
+    .language-switch button {
+      padding: 6px 9px;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: #66736a;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .language-switch button[aria-pressed="true"] {
+      background: white;
+      color: var(--green-dark);
+      box-shadow: 0 1px 3px rgb(35 53 42 / 10%);
+    }
+
+    main {
+      width: min(1120px, calc(100% - 48px));
+      margin: 54px auto 64px;
+    }
+
+    .intro { margin-bottom: 30px; }
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--green);
+      font-size: 12px;
+      font-weight: 750;
+      letter-spacing: .09em;
+      text-transform: uppercase;
+    }
+
+    .eyebrow::before {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #91b45f;
+      content: "";
+    }
+
+    h1 {
+      margin: 12px 0 9px;
+      font-size: clamp(30px, 4vw, 42px);
+      line-height: 1.12;
+      letter-spacing: -1.7px;
+    }
+
+    .intro p {
+      max-width: 620px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.65;
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(0, 1.03fr) minmax(0, .97fr);
+      gap: 22px;
+      align-items: start;
+    }
+
+    .card {
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    .card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 21px 23px 17px;
+    }
+
+    .card-head h2 {
+      margin: 0;
+      font-size: 16px;
+      letter-spacing: -.2px;
+    }
+
+    .step {
+      color: #8a958d;
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .upload-area {
+      position: relative;
+      display: flex;
+      min-height: 286px;
+      margin: 0 18px;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      border: 1.5px dashed #cbd8c8;
+      border-radius: 14px;
+      background: #fafbf8;
+      text-align: center;
+      transition: border-color .18s, background .18s;
+    }
+
+    .upload-area.dragging {
+      border-color: var(--green);
+      background: #f0f6ed;
+    }
+
+    .upload-area.has-image { min-height: 286px; }
+    .upload-area img {
+      display: none;
+      width: 100%;
+      height: 286px;
+      object-fit: contain;
+      background: #f4f5f0;
+    }
+
+    .upload-area.has-image img { display: block; }
+    .upload-content { padding: 24px; }
+    .upload-area.has-image .upload-content { display: none; }
+
+    .upload-icon {
+      width: 49px;
+      height: 49px;
+      display: grid;
+      place-items: center;
+      margin: 0 auto 13px;
+      border-radius: 15px;
+      background: var(--green-soft);
+      color: var(--green);
+    }
+
+    .upload-icon svg { width: 23px; height: 23px; }
+    .upload-title { margin: 0 0 5px; font-size: 14px; font-weight: 700; }
+    .upload-help { margin: 0; color: var(--muted); font-size: 12px; }
+    .browse {
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: var(--green);
+      font-weight: 700;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    .upload-input {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      clip-path: inset(50%);
+    }
+
+    .image-meta {
+      display: none;
+      position: absolute;
+      right: 10px;
+      bottom: 10px;
+      left: 10px;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      border: 1px solid rgb(231 235 227 / 90%);
+      border-radius: 10px;
+      background: rgb(255 255 255 / 94%);
+      text-align: left;
+    }
+
+    .has-image .image-meta { display: flex; }
+    .image-name {
+      min-width: 0;
+      overflow: hidden;
+      color: var(--ink);
+      font-size: 12px;
+      font-weight: 650;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .remove-image {
+      flex: 0 0 auto;
+      padding: 4px 7px;
+      border: 0;
+      border-radius: 7px;
+      background: #f1f3ef;
+      color: #637067;
+      font-size: 11px;
+      font-weight: 650;
+    }
+
+    .upload-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 18px 23px 20px;
+    }
+
+    .primary-button, .secondary-button {
+      min-height: 42px;
+      padding: 0 16px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      transition: background .18s, transform .18s;
+    }
+
+    .primary-button {
+      border: 1px solid var(--green);
+      background: var(--green);
+      color: white;
+    }
+
+    .primary-button:hover:not(:disabled) { background: var(--green-dark); transform: translateY(-1px); }
+    .primary-button:disabled { cursor: not-allowed; opacity: .48; }
+    .secondary-button { border: 1px solid var(--line); background: white; color: #536257; }
+    .secondary-button:hover { background: #f6f8f4; }
+
+    .privacy-note {
+      padding: 0 23px 20px;
+      color: #89938c;
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    .report-card { min-height: 470px; }
+    .report-head { border-bottom: 1px solid var(--line); }
+    .report-status {
+      padding: 6px 9px;
+      border-radius: 999px;
+      background: #f1f3ef;
+      color: #78837a;
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    .report-empty {
+      min-height: 385px;
+      display: flex;
+      padding: 34px;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+
+    .empty-art {
+      width: 100px;
+      height: 100px;
+      display: grid;
+      place-items: center;
+      margin-bottom: 18px;
+      border-radius: 50%;
+      background: #f3f6ed;
+      color: #9aaf7e;
+    }
+
+    .empty-art svg { width: 52px; height: 52px; }
+    .report-empty h3 { margin: 0 0 8px; font-size: 15px; }
+    .report-empty p { max-width: 270px; margin: 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+
+    .sample-label {
+      display: inline-flex;
+      margin-top: 15px;
+      padding: 6px 9px;
+      border-radius: 7px;
+      background: var(--amber-soft);
+      color: var(--amber);
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    .report-content { display: none; padding: 22px; }
+    .report-content.visible { display: block; }
+    .report-empty.hidden { display: none; }
+    .sample-notice {
+      margin-bottom: 17px;
+      padding: 9px 11px;
+      border: 1px solid #f0e2c6;
+      border-radius: 9px;
+      background: #fffaf0;
+      color: #896129;
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    .result-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+
+    .result-kicker { margin: 0 0 5px; color: var(--muted); font-size: 11px; }
+    .result-top h3 { margin: 0; font-size: 21px; letter-spacing: -.5px; }
+    .confidence {
+      flex: 0 0 auto;
+      padding: 7px 9px;
+      border-radius: 9px;
+      background: var(--green-soft);
+      color: var(--green-dark);
+      font-size: 11px;
+      font-weight: 750;
+    }
+
+    .confidence small { display: block; margin-bottom: 2px; color: #6d866f; font-size: 9px; font-weight: 600; }
+    .bar-label { display: flex; justify-content: space-between; margin-bottom: 7px; color: #56645a; font-size: 11px; }
+    .bar-track { height: 7px; overflow: hidden; border-radius: 10px; background: #edf0eb; }
+    .bar-fill { width: 0; height: 100%; border-radius: inherit; background: #69a36a; transition: width .5s ease; }
+    .section-title { margin: 21px 0 10px; font-size: 12px; font-weight: 750; }
+
+    .explanation {
+      display: grid;
+      grid-template-columns: 92px 1fr;
+      gap: 13px;
+      align-items: center;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      background: #fcfdfb;
+    }
+
+    .heatmap {
+      position: relative;
+      height: 80px;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      border-radius: 9px;
+      background: linear-gradient(140deg, #e9f0df, #cbdcaa);
+    }
+
+    .heatmap svg { width: 43px; height: 43px; color: #4a8250; }
+    .heat-spot {
+      position: absolute;
+      top: 17px;
+      left: 48px;
+      width: 28px;
+      height: 28px;
+      border: 2px solid rgb(226 117 50 / 85%);
+      border-radius: 50%;
+      background: rgb(248 178 82 / 34%);
+      box-shadow: 0 0 15px 4px rgb(242 146 62 / 24%);
+    }
+
+    .explanation p { margin: 0; color: #58655b; font-size: 11px; line-height: 1.55; }
+    .explanation strong { color: var(--ink); }
+
+    .signals { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 11px; }
+    .signal {
+      padding: 6px 8px;
+      border: 1px solid #e8ece5;
+      border-radius: 7px;
+      color: #627067;
+      font-size: 10px;
+    }
+
+    .recommendation {
+      margin-top: 16px;
+      padding: 12px 13px;
+      border-left: 3px solid #92ad6f;
+      border-radius: 0 9px 9px 0;
+      background: #f4f7ef;
+      color: #53624f;
+      font-size: 11px;
+      line-height: 1.55;
+    }
+
+    .recommendation strong { color: #354d38; }
+    .detail-section {
+      margin-top: 17px;
+      padding-top: 15px;
+      border-top: 1px solid var(--line);
+    }
+
+    .detail-section h4 { margin: 0 0 7px; font-size: 12px; }
+    .detail-section p, .detail-section li {
+      color: #58655b;
+      font-size: 11px;
+      line-height: 1.6;
+    }
+
+    .detail-section p { margin: 0; }
+    .detail-section ul { margin: 0; padding-left: 17px; }
+    .detail-section li + li { margin-top: 4px; }
+    [lang="hi"] { font-family: "Noto Sans Devanagari", "Nirmala UI", Mangal, sans-serif; }
+
+    .footer-note { margin-top: 22px; color: #8a948c; font-size: 11px; text-align: center; }
+
+    @media (max-width: 760px) {
+      main { margin-top: 36px; }
+      .workspace { grid-template-columns: 1fr; }
+      .report-card { min-height: 0; }
+      .report-empty { min-height: 300px; }
+    }
+
+    @media (max-width: 480px) {
+      .topbar { height: 64px; padding: 0 18px; }
+      .top-actions { gap: 8px; }
+      .top-note { display: none; }
+      main { width: calc(100% - 32px); margin-top: 30px; }
+      .intro { margin-bottom: 22px; }
+      .card-head { padding-right: 17px; padding-left: 17px; }
+      .upload-area { margin: 0 12px; }
+      .upload-actions { padding-right: 17px; padding-left: 17px; }
+      .privacy-note { padding-right: 17px; padding-left: 17px; }
+      .upload-actions .primary-button { flex: 1; }
+      .explanation { grid-template-columns: 76px 1fr; }
+      .heatmap { height: 72px; }
+      .heat-spot { left: 39px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M19.4 4.6C12.8 4.6 6.2 6.1 4.3 11.4c-1.1 3 1 6.2 4.1 6.2 6.4 0 10.5-6.1 11-13Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M4 21c2.8-5.6 6.6-8.8 12.1-11.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </span>
+      Citrus Lens
+    </div>
+    <div class="top-actions">
+      <span class="top-note" data-en="Explainable plant health" data-hi="समझने योग्य पौध स्वास्थ्य">Explainable plant health</span>
+      <div class="language-switch" role="group" aria-label="Choose language" data-aria-en="Choose language" data-aria-hi="भाषा चुनें">
+        <button type="button" data-language="en" aria-pressed="true">EN</button>
+        <button type="button" data-language="hi" aria-pressed="false">हिंदी</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="intro" aria-labelledby="page-title">
+      <span class="eyebrow" data-en="Citrus leaf assessment" data-hi="सिट्रस पत्ती का आकलन">Citrus leaf assessment</span>
+      <h1 id="page-title" data-en="A clearer view of plant health." data-hi="पौधों के स्वास्थ्य को बेहतर समझें।">A clearer view of plant health.</h1>
+      <p data-en="Upload a citrus leaf photo to explore a disease diagnosis and see which visual signs can influence a model's prediction." data-hi="सिट्रस पत्ती की तस्वीर अपलोड करें, संभावित रोग की जानकारी देखें और समझें कि कौन-से दिखाई देने वाले लक्षण मॉडल के अनुमान को प्रभावित कर सकते हैं।">Upload a citrus leaf photo to explore a disease diagnosis and see which visual signs can influence a model's prediction.</p>
+    </section>
+
+    <section class="workspace" aria-label="Citrus diagnosis workspace" data-aria-en="Citrus diagnosis workspace" data-aria-hi="सिट्रस निदान कार्यक्षेत्र">
+      <article class="card">
+        <div class="card-head">
+          <h2 data-en="Upload a leaf image" data-hi="पत्ती की तस्वीर अपलोड करें">Upload a leaf image</h2>
+          <span class="step" data-en="STEP 1 OF 2" data-hi="चरण 1 / 2">STEP 1 OF 2</span>
+        </div>
+        <div class="upload-area" id="drop-zone">
+          <input class="upload-input" id="file-input" type="file" accept="image/png,image/jpeg,image/webp">
+          <img id="preview" alt="Selected citrus leaf preview" data-alt-en="Selected citrus leaf preview" data-alt-hi="चुनी गई सिट्रस पत्ती की झलक">
+          <div class="upload-content">
+            <span class="upload-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+            <p class="upload-title" data-en="Drop a leaf photo here" data-hi="पत्ती की तस्वीर यहाँ छोड़ें">Drop a leaf photo here</p>
+            <p class="upload-help"><button class="browse" id="browse-button" type="button" data-en="Browse files" data-hi="फ़ाइल चुनें">Browse files</button> <span data-en="or drag and drop" data-hi="या फ़ाइल खींचकर यहाँ छोड़ें">or drag and drop</span></p>
+            <p class="upload-help" style="margin-top:8px" data-en="JPG, PNG or WEBP · up to 10 MB" data-hi="JPG, PNG या WEBP · अधिकतम 10 MB">JPG, PNG or WEBP · up to 10 MB</p>
+          </div>
+          <div class="image-meta">
+            <span class="image-name" id="image-name"></span>
+            <button class="remove-image" id="remove-button" type="button" data-en="Remove" data-hi="हटाएँ">Remove</button>
+          </div>
+        </div>
+        <div class="upload-actions">
+          <button class="primary-button" id="analyze-button" type="button" disabled data-en="Analyze leaf" data-hi="पत्ती का विश्लेषण करें">Analyze leaf</button>
+        </div>
+        <div class="privacy-note" data-en="Images stay in your browser in this preview. Diagnosis requires a connected model service." data-hi="इस पूर्वावलोकन में तस्वीर आपके ब्राउज़र में ही रहती है। वास्तविक निदान के लिए मॉडल सेवा जोड़ना आवश्यक है।">Images stay in your browser in this preview. Diagnosis requires a connected model service.</div>
+      </article>
+
+      <article class="card report-card">
+        <div class="card-head report-head">
+          <h2 data-en="Diagnosis &amp; explanation" data-hi="निदान और उसका कारण">Diagnosis &amp; explanation</h2>
+          <span class="report-status" id="report-status">SAMPLE REPORT</span>
+        </div>
+        <div class="report-content visible" id="report-content" aria-live="polite">
+          <div class="sample-notice" data-en="Illustrative sample only — this report is not generated from your uploaded image." data-hi="केवल उदाहरण: यह रिपोर्ट आपकी अपलोड की गई तस्वीर से तैयार नहीं हुई है।">Illustrative sample only — this report is not generated from your uploaded image.</div>
+          <div class="result-top">
+            <div>
+              <p class="result-kicker" data-en="Example condition" data-hi="उदाहरण के लिए संभावित रोग">Example condition</p>
+              <h3 data-en="Citrus canker" data-hi="सिट्रस कैंकर (बैक्टीरियल रोग)">Citrus canker</h3>
+            </div>
+            <div class="confidence"><small data-en="SAMPLE SCORE" data-hi="उदाहरण स्कोर">SAMPLE SCORE</small>87%</div>
+          </div>
+          <div class="bar-label"><span data-en="Citrus canker" data-hi="सिट्रस कैंकर">Citrus canker</span><strong>87%</strong></div>
+          <div class="bar-track" role="img" aria-label="Illustrative sample score: 87 percent" data-aria-en="Illustrative sample score: 87 percent" data-aria-hi="उदाहरण स्कोर: 87 प्रतिशत"><div class="bar-fill" id="confidence-bar"></div></div>
+          <p class="section-title" data-en="Why this may look like canker" data-hi="यह कैंकर जैसा क्यों दिख सकता है">Why this may look like canker</p>
+          <div class="explanation">
+            <div class="heatmap" aria-label="Illustrative highlighted leaf region" data-aria-en="Illustrative highlighted leaf region" data-aria-hi="उदाहरण के लिए हाइलाइट किया गया पत्ती का भाग">
+              <svg viewBox="0 0 48 48" fill="none"><path d="M39 7C25 7 11 10.3 8 21.8c-1.8 6.3 2.1 12.5 8.3 12.5C29.5 34.3 38.2 21.4 39 7Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M7 42c5.8-11.6 13.6-18.1 24.8-24" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              <span class="heat-spot"></span>
+            </div>
+            <p data-en="Raised, corky-looking spots with yellow or oily-looking margins can be associated with citrus canker. The orange highlight is illustrative—not generated from your photo and not proof of what caused symptoms." data-hi="उभरे हुए, खुरदरे धब्बे जिनके आसपास पीला या तैलीय-सा किनारा हो, सिट्रस कैंकर से जुड़े हो सकते हैं। नारंगी हाइलाइट केवल उदाहरण है—यह आपकी तस्वीर से नहीं बना है और लक्षणों के कारण का प्रमाण नहीं है।">Raised, corky-looking spots with yellow or oily-looking margins can be associated with citrus canker. The orange highlight is illustrative—not generated from your photo and not proof of what caused symptoms.</p>
+          </div>
+          <div class="signals" aria-label="Illustrative visual signals" data-aria-en="Illustrative visual signals" data-aria-hi="उदाहरण के लिए दिखाई देने वाले संकेत">
+            <span class="signal" data-en="Raised spots" data-hi="उभरे हुए धब्बे">Raised spots</span>
+            <span class="signal" data-en="Yellow margins" data-hi="पीले किनारे">Yellow margins</span>
+            <span class="signal" data-en="Leaf lesions" data-hi="पत्ती के घाव">Leaf lesions</span>
+          </div>
+          <div class="detail-section">
+            <h4 data-en="About citrus canker" data-hi="सिट्रस कैंकर के बारे में">About citrus canker</h4>
+            <p data-en="Citrus canker is a bacterial disease that can affect leaves, twigs and fruit. Similar-looking marks can also have other causes, so a photo-based impression should not be treated as a confirmed diagnosis." data-hi="सिट्रस कैंकर एक जीवाणुजनित रोग है जो पत्तियों, टहनियों और फलों को प्रभावित कर सकता है। ऐसे ही दिखने वाले धब्बों के अन्य कारण भी हो सकते हैं, इसलिए तस्वीर के आधार पर अनुमान को पक्का निदान न मानें।">Citrus canker is a bacterial disease that can affect leaves, twigs and fruit. Similar-looking marks can also have other causes, so a photo-based impression should not be treated as a confirmed diagnosis.</p>
+          </div>
+          <div class="detail-section">
+            <h4 data-en="Signs to check" data-hi="किन लक्षणों पर ध्यान दें">Signs to check</h4>
+            <ul>
+              <li data-en="Small raised, tan-to-brown spots that may become corky." data-hi="छोटे उभरे हुए हल्के भूरे से गहरे भूरे धब्बे, जो बाद में खुरदरे हो सकते हैं।">Small raised, tan-to-brown spots that may become corky.</li>
+              <li data-en="Yellow or water-soaked-looking margins around spots; check both leaf surfaces." data-hi="धब्बों के आसपास पीला या पानी से भीगा-सा किनारा; पत्ती की दोनों सतहें देखें।">Yellow or water-soaked-looking margins around spots; check both leaf surfaces.</li>
+              <li data-en="Similar lesions on young twigs or fruit may add context, but need expert assessment." data-hi="नई टहनियों या फलों पर ऐसे घाव अतिरिक्त संकेत हो सकते हैं, पर विशेषज्ञ से जाँच ज़रूरी है।">Similar lesions on young twigs or fruit may add context, but need expert assessment.</li>
+            </ul>
+          </div>
+          <div class="detail-section">
+            <h4 data-en="Spread and conditions" data-hi="फैलाव और अनुकूल परिस्थितियाँ">Spread and conditions</h4>
+            <p data-en="The bacteria can spread with wind-driven rain and contaminated plant material or tools. Avoid handling wet plants, and clean tools between plants. Follow local plant-health guidance, especially before moving citrus plants." data-hi="यह जीवाणु हवा के साथ आने वाली बारिश तथा संक्रमित पौध सामग्री या औज़ारों से फैल सकता है। गीले पौधों को छूने से बचें और पौधों के बीच औज़ार साफ़ करें। स्थानीय पौध-स्वास्थ्य निर्देशों का पालन करें, विशेषकर सिट्रस पौधों को कहीं ले जाने से पहले।">The bacteria can spread with wind-driven rain and contaminated plant material or tools. Avoid handling wet plants, and clean tools between plants. Follow local plant-health guidance, especially before moving citrus plants.</p>
+          </div>
+          <div class="recommendation"><strong data-en="Practical next steps" data-hi="अभी क्या करें">Practical next steps</strong><span data-en=" Photograph the whole plant and close-ups of both leaf sides. Compare several leaves, note whether symptoms are spreading, and ask a local horticulture or agriculture extension specialist for confirmation. Do not apply treatments based only on this sample." data-hi=" पूरे पौधे और पत्ती की दोनों सतहों की नज़दीकी तस्वीरें लें। कई पत्तियों की तुलना करें, लक्षण बढ़ रहे हैं या नहीं नोट करें, और पुष्टि के लिए स्थानीय बागवानी या कृषि विशेषज्ञ से संपर्क करें। केवल इस नमूने के आधार पर उपचार न करें।"> Photograph the whole plant and close-ups of both leaf sides. Compare several leaves, note whether symptoms are spreading, and ask a local horticulture or agriculture extension specialist for confirmation. Do not apply treatments based only on this sample.</span></div>
+          <div class="detail-section">
+            <h4 data-en="Understanding the score" data-hi="स्कोर को समझें">Understanding the score</h4>
+            <p data-en="The 87% value is a made-up sample score to demonstrate the interface. It is not a measured probability, and no machine-learning model or image explanation is connected." data-hi="87% केवल इंटरफ़ेस दिखाने के लिए बनाया गया उदाहरण स्कोर है। यह मापी गई संभावना नहीं है; यहाँ कोई मशीन-लर्निंग मॉडल या तस्वीर-आधारित व्याख्या जुड़ी नहीं है।">The 87% value is a made-up sample score to demonstrate the interface. It is not a measured probability, and no machine-learning model or image explanation is connected.</p>
+          </div>
+        </div>
+      </article>
+    </section>
+    <p class="footer-note" data-en="For learning and decision support only · Confirm diagnoses with a qualified plant-health professional." data-hi="केवल सीखने और निर्णय में सहायता के लिए · निदान की पुष्टि योग्य पौध-स्वास्थ्य विशेषज्ञ से करें।">For learning and decision support only · Confirm diagnoses with a qualified plant-health professional.</p>
+  </main>
+
+  <script>
+    const fileInput = document.getElementById("file-input");
+    const dropZone = document.getElementById("drop-zone");
+    const preview = document.getElementById("preview");
+    const imageName = document.getElementById("image-name");
+    const analyzeButton = document.getElementById("analyze-button");
+    const reportStatus = document.getElementById("report-status");
+    const reportContent = document.getElementById("report-content");
+    let currentLanguage = "en";
+    let currentStatus = "sample";
+    let previewUrl;
+
+    const translations = {
+      en: {
+        ready: "IMAGE READY",
+        sample: "SAMPLE REPORT",
+        title: "Citrus Lens — Explainable leaf diagnosis",
+        chooseImage: "Choose a JPG, PNG or WEBP image.",
+        imageTooLarge: "Choose an image smaller than 10 MB.",
+        modelUnavailable: "The image preview works, but a diagnosis model is not connected yet. Use “View sample report” to explore the explainability layout."
+      },
+      hi: {
+        awaiting: "तस्वीर की प्रतीक्षा",
+        ready: "तस्वीर तैयार",
+        sample: "नमूना रिपोर्ट",
+        title: "Citrus Lens — सिट्रस पत्ती का समझने योग्य निदान",
+        chooseImage: "JPG, PNG या WEBP तस्वीर चुनें।",
+        imageTooLarge: "10 MB से छोटी तस्वीर चुनें।",
+        modelUnavailable: "तस्वीर का पूर्वावलोकन उपलब्ध है, लेकिन निदान मॉडल अभी जुड़ा नहीं है। व्याख्या का प्रारूप देखने के लिए “नमूना रिपोर्ट देखें” चुनें।"
+      }
+    };
+
+    function updateStatus(status) {
+      currentStatus = status;
+      reportStatus.textContent = translations[currentLanguage][status];
+    }
+
+    function setLanguage(language) {
+      currentLanguage = language;
+      document.documentElement.lang = language;
+      document.title = translations[language].title;
+      document.querySelectorAll("[data-en][data-hi]").forEach((element) => {
+        element.textContent = element.dataset[language];
+      });
+      document.querySelectorAll("[data-alt-en][data-alt-hi]").forEach((element) => {
+        element.alt = language === "en" ? element.dataset.altEn : element.dataset.altHi;
+      });
+      document.querySelectorAll("[data-aria-en][data-aria-hi]").forEach((element) => {
+        element.setAttribute("aria-label", language === "en" ? element.dataset.ariaEn : element.dataset.ariaHi);
+      });
+      document.querySelectorAll("[data-language]").forEach((button) => {
+        button.setAttribute("aria-pressed", String(button.dataset.language === language));
+      });
+      updateStatus(currentStatus);
+    }
+
+    function clearPreview() {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      previewUrl = undefined;
+      preview.removeAttribute("src");
+      imageName.textContent = "";
+      dropZone.classList.remove("has-image");
+      fileInput.value = "";
+      analyzeButton.disabled = true;
+      updateStatus("sample");
+      reportContent.classList.add("visible");
+    }
+
+    function selectImage(file) {
+      if (!file) return;
+      if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+        window.alert(translations[currentLanguage].chooseImage);
+        return;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        window.alert(translations[currentLanguage].imageTooLarge);
+        return;
+      }
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      previewUrl = URL.createObjectURL(file);
+      preview.src = previewUrl;
+      imageName.textContent = file.name;
+      dropZone.classList.add("has-image");
+      analyzeButton.disabled = false;
+      updateStatus("ready");
+      reportContent.classList.add("visible");
+    }
+
+    document.getElementById("browse-button").addEventListener("click", () => fileInput.click());
+    document.querySelectorAll("[data-language]").forEach((button) => {
+      button.addEventListener("click", () => setLanguage(button.dataset.language));
+    });
+    fileInput.addEventListener("change", (event) => selectImage(event.target.files[0]));
+    document.getElementById("remove-button").addEventListener("click", clearPreview);
+    analyzeButton.addEventListener("click", () => {
+      window.alert(translations[currentLanguage].modelUnavailable);
+    });
+    requestAnimationFrame(() => {
+      document.getElementById("confidence-bar").style.width = "87%";
+    });
+
+    ["dragenter", "dragover"].forEach((eventName) => {
+      dropZone.addEventListener(eventName, (event) => {
+        event.preventDefault();
+        dropZone.classList.add("dragging");
+      });
+    });
+    ["dragleave", "drop"].forEach((eventName) => {
+      dropZone.addEventListener(eventName, (event) => {
+        event.preventDefault();
+        dropZone.classList.remove("dragging");
+      });
+    });
+    dropZone.addEventListener("drop", (event) => selectImage(event.dataTransfer.files[0]));
+    window.addEventListener("beforeunload", () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    });
+  </script>
+</body>
+</html>
